@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+/data/data_splits/*/*.npy
+/data/*/*.wav
+/.idea
+/coco_caption/pycocoevalcap/spice/tmp/*
+/tmp
+/model_ckpt

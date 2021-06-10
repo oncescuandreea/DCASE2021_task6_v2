@@ -16,8 +16,8 @@ from pathlib import Path
 from data_handling.clotho_dataset import get_clotho_loader
 from tools.config_loader import get_config
 from tools.utils import setup_seed, align_word_embedding, \
-set_tgt_padding_mask, rotation_logger, \
-decode_output, beam_search, greedy_decode
+    set_tgt_padding_mask, rotation_logger, \
+    decode_output, beam_search, greedy_decode, str2bool
 from tools.file_io import load_picke_file
 from models.TransModel import TransformerModel
 from pprint import PrettyPrinter
@@ -173,13 +173,21 @@ def eval_beam(data, beam_size, max_len=30):
 parser = argparse.ArgumentParser(description='Finetune using Reinforcement learning')
 
 parser.add_argument('-n', '--exp_name', type=str, default='exp1', help='name of the experiment')
+parser.add_argument('-lr', '--lr', type=float, default=0.00001)
+parser.add_argument('-warmup', '--warmup', type=str2bool)
+parser.add_argument('-model_path', '--model_path', type=str)
+parser.add_argument('-batch', '--batch', type=int)
+
 args = parser.parse_args()
 
 config = get_config()
-
+config.data.batch_size = args.batch
+config.rl.lr = args.lr
+config.warmup = args.warmup
+config.rl.model = args.model_path
 setup_seed(config.training.seed)
 
-exp_name = args.exp_name
+exp_name = "{}_LR-{}_Warmup-{}".format(args.exp_name, args.lr, args.warmup)
 
 model_output_dir = Path('rl_outputs', exp_name, 'model')
 log_output_dir = Path('rl_outputs', exp_name, 'logging')
@@ -212,7 +220,8 @@ device, device_name = (torch.device('cuda'), torch.cuda.get_device_name(torch.cu
 main_logger.info('Finetune using Reinforcement Learning.')
 main_logger.info(f'Process on {device_name}')
 
-words_list_path = 'data/pickles/new_words_list.p'
+words_list_path = config.path.clotho.words_list
+# words_list_path = 'data/pickles/new_words_list.p'
 words_list = load_picke_file(words_list_path)
 ntokens = len(words_list)
 sos_ind = words_list.index('<sos>')
@@ -269,8 +278,8 @@ spiders = []
 main_logger.info(f'Optimize {config.rl.mode} search.')
 
 for epoch in range(ep, epochs + 1):
-
-    scheduler_warmup.step(epoch)
+    if config.warmup:
+        scheduler_warmup.step(epoch)
 
     main_logger.info(f'Finetune using RL epoch {epoch}...')
     train()
@@ -281,3 +290,5 @@ for epoch in range(ep, epochs + 1):
     eval_beam(evaluation_data, beam_size=4)
 #    eval_beam(evaluation_data, beam_size=5)
 main_logger.info('Finetune done.')
+
+

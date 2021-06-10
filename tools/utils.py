@@ -13,8 +13,18 @@ from loguru import logger
 from gensim.models.word2vec import Word2Vec
 
 
-def setup_seed(seed):
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise ValueError('Boolean value expected.')
 
+
+def setup_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
@@ -24,7 +34,6 @@ def setup_seed(seed):
 
 
 def mixup_data(tgt, alpha=1):
-
     if alpha > 0:
         lam = np.random.beta(alpha, alpha)
     else:
@@ -63,7 +72,6 @@ def set_tgt_padding_mask(tgt, tgt_len):
 
 
 def greedy_decode(model, src, max_len=30, sos_ind=0):
-
     model.eval()
     with torch.no_grad():
         batch_size = src.shape[0]
@@ -82,7 +90,6 @@ def greedy_decode(model, src, max_len=30, sos_ind=0):
 
 
 def decode_output(predicted_output, ref_captions, file_names, words_list, output_dir, beam=False):
-
     if beam:
         caption_logger = logger.bind(indent=3)
         caption_logger.info('Captions start')
@@ -93,7 +100,6 @@ def decode_output(predicted_output, ref_captions, file_names, words_list, output
         caption_logger.info('Greedy search:')
 
     captions_pred, captions_gt, f_names = [], [], []
-
 
     for pred_words, ref_cap, f_name in zip(predicted_output, ref_captions, file_names):
         pred_cap = [words_list[i] for i in pred_words]
@@ -112,8 +118,8 @@ def decode_output(predicted_output, ref_captions, file_names, words_list, output
 
         if f_name not in f_names:
             f_names.append(f_name)
-            captions_pred.append({'file_name':f_name,'caption_predicted': pred_cap})
-            captions_gt.append({'file_name':f_name,'caption_1': gt_cap})
+            captions_pred.append({'file_name': f_name, 'caption_predicted': pred_cap})
+            captions_gt.append({'file_name': f_name, 'caption_1': gt_cap})
         else:
             for index, gt_dict in enumerate(captions_gt):
                 if f_name == gt_dict['file_name']:
@@ -134,7 +140,6 @@ def decode_output(predicted_output, ref_captions, file_names, words_list, output
 
 
 def align_word_embedding(words_list, model_path, nhid):
-
     w2v_model = Word2Vec.load(model_path)
     ntoken = len(words_list)
     weights = torch.randn(ntoken, nhid)
