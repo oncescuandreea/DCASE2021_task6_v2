@@ -68,7 +68,8 @@ def create_dataset():
         split_dir = Path('data/data_splits', split_name)
         split_dir.mkdir(parents=True, exist_ok=True)
 
-        audio_dir = Path('data', split_name)
+        # audio_dir = Path('data', split_name)
+        audio_dir = Path('/scratch/shared/beegfs/koepke/shared-datasets/CLOTHO/wavs-16kHz')
 
         inner_logger.info(f'Creating the {split_name} split.')
         _create_split_data(split_csv, split_dir, audio_dir, words_list)

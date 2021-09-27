@@ -12,6 +12,7 @@ from pathlib import Path
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
 from tools.file_io import load_picke_file, load_csv_file
+import pickle
 
 
 def _sentence_process(sentence, add_specials=False):
@@ -35,12 +36,17 @@ class AudioCapsDataset(Dataset):
 
     def __init__(self, split):
         super(AudioCapsDataset, self).__init__()
-        self.wav_path = '/vol/research/AAC_CVSSP_research/AudioCaps/data/' + split
+        # self.wav_path = '/vol/research/AAC_CVSSP_research/AudioCaps/data/' + split
+        self.wav_path = '/scratch/shared/beegfs/albanie/shared-datasets/AudioCaps/wavs-16kHz'
         csv_path = 'audiocaps/csv_files/new_' + split + '.csv'
         vocabulary_path = 'audiocaps/pickles/words_list.p'
 
         self.vocabulary = load_picke_file(vocabulary_path)
         self.examples = load_csv_file(csv_path)
+        # with open('/scratch/shared/beegfs/albanie/shared-datasets/AudioCaps/renaming_reversed.pkl', 'rb') as f:
+        #     rename_dict = pickle.load(f)
+
+        # self.rename_dict = rename_dict
 
     def __len__(self):
         return len(self.examples)
@@ -49,6 +55,7 @@ class AudioCapsDataset(Dataset):
 
         ex = self.examples[item]
         file_name = ex['file_name']
+        # new_file_name = self.rename_dict[file_name]
         audio_path = self.wav_path + '/' + file_name
         audio = librosa.load(audio_path, sr=32000)[0]
         caption = _sentence_process(ex['caption'], add_specials=True)

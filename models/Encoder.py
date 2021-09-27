@@ -168,7 +168,8 @@ class Cnn10(nn.Module):
         x = torch.mean(x, dim=3)  # average in the frequency domain (batch_size, channel, time)
 
         x = x.permute(2, 0, 1)  # time x batch x channel (512)
-        x = F.relu_(self.fc1(x))
+        x_fc1 = self.fc1(x)
+        x = F.relu_(x_fc1)
         x = F.dropout(x, p=0.2, training=self.training)
         return x
 
