@@ -137,7 +137,7 @@ class Cnn10(nn.Module):
         init_bn(self.bn0)
         init_layer(self.fc1)
 
-    def forward(self, input, mixup_param=None):
+    def intermediate_forward(self, input, mixup_param=None):
         """ input: (batch_size, time_steps, mel_bins)"""
 
         if self.input_data == 'audio_data':
@@ -169,6 +169,12 @@ class Cnn10(nn.Module):
 
         x = x.permute(2, 0, 1)  # time x batch x channel (512)
         x_fc1 = self.fc1(x)
+        return x_fc1
+
+    def forward(self, input, mixup_param=None):
+        """ input: (batch_size, time_steps, mel_bins)"""
+
+        x_fc1 = self.intermediate_forward(input, mixup_param)
         x = F.relu_(x_fc1)
         x = F.dropout(x, p=0.2, training=self.training)
         return x

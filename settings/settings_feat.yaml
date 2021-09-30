@@ -22,7 +22,7 @@ decoder:
 
 encoder:
   model: 'Cnn10'
-  freeze: No # used to be No
+  freeze: Yes # used to be No
   pretrained: No # used to be Yes
 
 word_embedding:
@@ -34,8 +34,11 @@ data:
   type: 'audiocaps'  # 'clotho' 'audiocaps'
   input_field_name: 'audio_data'  # 'feature'
   batch_size: 32
-  num_workers: 10
+  num_workers: 16
   load_into_memory: No
+
+feature_data:
+  type: 'sounddescs'
 
 
 training:
@@ -63,7 +66,10 @@ path:
     words_freq: 'data/pickles/words_freq.p' 
   audiocaps:
     words_list: 'audiocaps/pickles/words_list.p'
-    words_freq: 'audiocaps/pickles/words_freq.p' 
+    words_freq: 'audiocaps/pickles/words_freq.p'
+  sounddescs:
+    words_list: 'sounddescs/pickles/words_list.p'
+    words_freq: 'sounddescs/pickles/words_freq.p' 
   encoder: 'pretrained_models/encoder/'
   word2vec: 'pretrained_models/word2vec/w2v_all_vocabulary.model'
   model: 'outputs/exp1/model/best_model.pt'

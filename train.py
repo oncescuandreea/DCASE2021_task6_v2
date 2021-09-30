@@ -213,7 +213,7 @@ def test_beam(beam_size, max_len=30):
 
 parser = argparse.ArgumentParser(description='Settings for audio caption model')
 
-parser.add_argument('-n', '--exp_name', type=str, default='exp1', help='name of the experiment')
+parser.add_argument('-n', '--exp_name', type=str, default='exp_filtered', help='name of the experiment')
 parser.add_argument('-m', '--mask_type', type=str, default='zero_value', help='masking type')
 
 args = parser.parse_args()

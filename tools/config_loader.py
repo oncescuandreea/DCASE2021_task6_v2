@@ -8,9 +8,9 @@ import yaml
 from dotmap import DotMap
 
 
-def get_config():
+def get_config(config_file: str = 'settings.yaml'):
 
-    with open('settings/settings.yaml', 'r') as f:
+    with open(f'settings/{config_file}', 'r') as f:
 
         config = yaml.load(f, Loader=yaml.FullLoader)
     config = DotMap(config)
