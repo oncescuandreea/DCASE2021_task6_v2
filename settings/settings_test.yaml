@@ -1,0 +1,81 @@
+mode: 'train' # 'eval' 'test' 'finetune' used to be train
+
+
+wave:
+  sr: 44100
+  window_size: 1024
+  hop_length: 512
+  mel_bins: 64
+  fmin: 50
+  fmax: 14000
+
+
+decoder:
+  decoder_only: Yes
+  nhead: 4
+  nhid: 128
+  nlayers: 2
+  dropout: 0.2
+  dim_feedforward: 2048
+  activation: 'gelu'
+
+
+encoder:
+  model: 'VGGish'
+  freeze: No # used to be No
+  pretrained: No # used to be Yes
+
+word_embedding:
+  pretrained: No
+  freeze: Yes
+
+
+data:
+  type: 'audiocaps'  # 'clotho' 'audiocaps'
+  input_field_name: 'audio_data'  # 'feature'
+  batch_size: 32
+  num_workers: 10
+  load_into_memory: No
+
+
+training:
+  mixup: No
+  alpha: 0.2
+  label_smoothing: Yes
+  keyword: No
+  spec_augmentation: Yes
+  epochs: 30
+  lr: !!float 1e-3
+  clip_grad: 2
+  seed: 20
+
+
+finetune:
+  audiocap: No
+  lr: !!float 1e-4
+  model: "pretrained_models/models/submission1/best_model.pt"
+  epochs: 20
+
+
+path:
+  clotho:
+    words_list: 'data/pickles/words_list.p'
+    words_freq: 'data/pickles/words_freq.p' 
+  audiocaps:
+    words_list: 'audiocaps/pickles/words_list.p'
+    words_freq: 'audiocaps/pickles/words_freq.p' 
+    data_location: '/scratch/shared/beegfs/albanie/shared-datasets/AudioCaps/wavs-16kHz'
+    max_feats: 10
+  encoder: 'pretrained_models/encoder/'
+  word2vec: 'pretrained_models/word2vec/w2v_all_vocabulary.model'
+  model: 'outputs/exp1/model/best_model.pt'
+
+
+rl:
+  mode: 'greedy'  # 'beam'
+  epochs: 25
+  model: "pretrained_models/models/submission1/best_model.pt"
+  lr: !!float 1e-4
+
+test:
+  model: ''

@@ -2,13 +2,16 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch import hub
+from typing import Iterable
+import models.vggish_utils as utils
 
-from . import vggish_input, vggish_params
+from models.vggish_utils import waveform_to_examples, wavfile_to_examples
 
 
 class VGG(nn.Module):
-    def __init__(self, features):
+    def __init__(self, features, use_relu: bool = False):
         super(VGG, self).__init__()
+        self.use_relu = use_relu
         self.features = features
         self.embeddings = nn.Sequential(
             nn.Linear(512 * 4 * 6, 4096),
@@ -16,7 +19,9 @@ class VGG(nn.Module):
             nn.Linear(4096, 4096),
             nn.ReLU(True),
             nn.Linear(4096, 128),
-            nn.ReLU(True))
+        )
+        self.upscale = nn.Linear(128, 512)
+        self.final_relu = nn.ReLU(True)
 
     def forward(self, x):
         x = self.features(x)
@@ -28,7 +33,11 @@ class VGG(nn.Module):
         x = x.contiguous()
         x = x.view(x.size(0), -1)
 
-        return self.embeddings(x)
+        x = self.embeddings(x)
+        x = self.upscale(x)
+        if self.use_relu:
+            x = self.final_relu(x)
+        return x
 
 
 class Postprocessor(nn.Module):
@@ -49,11 +58,11 @@ class Postprocessor(nn.Module):
         super(Postprocessor, self).__init__()
         # Create empty matrix, for user's state_dict to load
         self.pca_eigen_vectors = torch.empty(
-            (vggish_params.EMBEDDING_SIZE, vggish_params.EMBEDDING_SIZE,),
+            (utils.EMBEDDING_SIZE, utils.EMBEDDING_SIZE,),
             dtype=torch.float,
         )
         self.pca_means = torch.empty(
-            (vggish_params.EMBEDDING_SIZE, 1), dtype=torch.float
+            (utils.EMBEDDING_SIZE, 1), dtype=torch.float
         )
 
         self.pca_eigen_vectors = nn.Parameter(self.pca_eigen_vectors, requires_grad=False)
@@ -74,7 +83,7 @@ class Postprocessor(nn.Module):
             embeddings_batch.shape,
         )
         assert (
-            embeddings_batch.shape[1] == vggish_params.EMBEDDING_SIZE
+            embeddings_batch.shape[1] == utils.EMBEDDING_SIZE
         ), "Bad batch shape: %r" % (embeddings_batch.shape,)
 
         # Apply PCA.
@@ -89,14 +98,14 @@ class Postprocessor(nn.Module):
         # Quantize by:
         # - clipping to [min, max] range
         clipped_embeddings = torch.clamp(
-            pca_applied, vggish_params.QUANTIZE_MIN_VAL, vggish_params.QUANTIZE_MAX_VAL
+            pca_applied, utils.QUANTIZE_MIN_VAL, utils.QUANTIZE_MAX_VAL
         )
         # - convert to 8-bit in range [0.0, 255.0]
         quantized_embeddings = torch.round(
-            (clipped_embeddings - vggish_params.QUANTIZE_MIN_VAL)
+            (clipped_embeddings - utils.QUANTIZE_MIN_VAL)
             * (
                 255.0
-                / (vggish_params.QUANTIZE_MAX_VAL - vggish_params.QUANTIZE_MIN_VAL)
+                / (utils.QUANTIZE_MAX_VAL - utils.QUANTIZE_MIN_VAL)
             )
         )
         return torch.squeeze(quantized_embeddings)
@@ -105,9 +114,9 @@ class Postprocessor(nn.Module):
         return self.postprocess(x)
 
 
-def make_layers():
+def make_layers(in_channels: int):
     layers = []
-    in_channels = 1
+    # in_channels = 1
     for v in [64, "M", 128, "M", 256, 256, "M", 512, 512, "M"]:
         if v == "M":
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
@@ -121,12 +130,9 @@ def make_layers():
 def _vgg():
     return VGG(make_layers())
 
-
-
-
 class VGGish(VGG):
-    def __init__(self, urls, device=None, pretrained=True, preprocess=True, postprocess=True, progress=True):
-        super().__init__(make_layers())
+    def __init__(self, urls, config, device=None, pretrained=False, preprocess=True, postprocess=False, progress=True):
+        super().__init__(make_layers(config.data.batch_size))
         if pretrained:
             state_dict = hub.load_state_dict_from_url(urls['vggish'], progress=progress)
             super().load_state_dict(state_dict)
@@ -136,16 +142,17 @@ class VGGish(VGG):
         self.device = device
         self.preprocess = preprocess
         self.postprocess = postprocess
+        self.config = config
         if self.postprocess:
             self.pproc = Postprocessor()
             if pretrained:
                 state_dict = hub.load_state_dict_from_url(urls['pca'], progress=progress)
                 # TODO: Convert the state_dict to torch
-                state_dict[vggish_params.PCA_EIGEN_VECTORS_NAME] = torch.as_tensor(
-                    state_dict[vggish_params.PCA_EIGEN_VECTORS_NAME], dtype=torch.float
+                state_dict[utils.PCA_EIGEN_VECTORS_NAME] = torch.as_tensor(
+                    state_dict[utils.PCA_EIGEN_VECTORS_NAME], dtype=torch.float
                 )
-                state_dict[vggish_params.PCA_MEANS_NAME] = torch.as_tensor(
-                    state_dict[vggish_params.PCA_MEANS_NAME].reshape(-1, 1), dtype=torch.float
+                state_dict[utils.PCA_MEANS_NAME] = torch.as_tensor(
+                    state_dict[utils.PCA_MEANS_NAME].reshape(-1, 1), dtype=torch.float
                 )
 
                 self.pproc.load_state_dict(state_dict)
@@ -161,10 +168,26 @@ class VGGish(VGG):
         return x
 
     def _preprocess(self, x, fs):
+        dataset = self.config.data.type
         if isinstance(x, np.ndarray):
-            x = vggish_input.waveform_to_examples(x, fs)
+            x = waveform_to_examples(x, fs)
         elif isinstance(x, str):
-            x = vggish_input.wavfile_to_examples(x)
+            x = wavfile_to_examples(x)
+        elif isinstance(x, Iterable):
+            if isinstance(x[0], str):
+                x_batch = []
+                for element in x:
+                    x_prev = wavfile_to_examples(f'{self.config.path[dataset].data_location}/{element}')
+                    # print(f'x_prev shape {x_prev.shape}')
+                    max_dim = self.config.path[dataset].max_feats
+
+                    x_padded = torch.zeros(max_dim, *x_prev.shape[1:])
+                    x_padded[:x_prev.shape[0]] = x_prev
+                    # print(f'x_padded shape {x_padded.shape}')
+                    x_batch.append(x_padded)
+                x = torch.cat(x_batch, dim=1)
+            else:
+                raise AttributeError
         else:
             raise AttributeError
         return x

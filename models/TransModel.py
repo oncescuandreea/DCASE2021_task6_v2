@@ -12,6 +12,7 @@ import numpy as np
 from torch.nn import TransformerEncoder, TransformerEncoderLayer,\
 TransformerDecoder, TransformerDecoderLayer
 from models.Encoder import Cnn10, Cnn14
+from models.Encoder_vggish import VGGish
 from models.LinearModule import AudioLinear
 
 
@@ -67,14 +68,22 @@ class TransformerModel(nn.Module):
         self.model_type = 'Cnn+Transformer'
 
         ntoken = len(words_list)
+        model_urls = {
+            'vggish': 'https://github.com/harritaylor/torchvggish/'
+                    'releases/download/v0.1/vggish-10086976.pth',
+            'pca': 'https://github.com/harritaylor/torchvggish/'
+                'releases/download/v0.1/vggish_pca_params-970ea276.pth'
+        }
 
         # setting for CNN
         if config.encoder.model == 'Cnn10':
             self.feature_extractor = Cnn10(config)
         elif config.encoder.model == 'Cnn14':
             self.feature_extractor = Cnn14(config)
+        elif config.encoder.model == 'VGGish':
+            self.feature_extractor = VGGish(urls=model_urls, config=config)
         else:
-            raise NameError('No such enocder model')
+            raise NameError('No such encoder model')
 
         if pretrained_cnn is not None:
             dict_trained = pretrained_cnn
@@ -143,6 +152,7 @@ class TransformerModel(nn.Module):
     def encode(self, src, mixup_param=None):
 
         src = self.feature_extractor(src, mixup_param)
+        # import pdb; pdb.set_trace()
         src = self.audio_linear(src)
 
         if not self.decoder_only:
@@ -150,6 +160,7 @@ class TransformerModel(nn.Module):
             src = self.pos_encoder(src)
             src = self.transformer_encoder(src, None)
 
+        
         return src
 
     def decode(self, mem, tgt, mixup_param=None, input_mask=None, target_mask=None, target_padding_mask=None):
@@ -179,6 +190,7 @@ class TransformerModel(nn.Module):
     def forward(self, src, tgt, mixup_param=None, input_mask=None, target_mask=None, target_padding_mask=None):
 
         mem = self.encode(src, mixup_param)
+        # import pdb; pdb.set_trace()
         output = self.decode(mem, tgt, mixup_param,
                              input_mask=input_mask,
                              target_mask=target_mask,
